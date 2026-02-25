@@ -5,8 +5,9 @@ import Link from "next/link"
 import { Dropzone } from "@/components/dropzone"
 import { UploadResult } from "@/components/upload-result"
 import { ConciliationResult } from "@/components/conciliation-result"
+import { RiskAnalysis } from "@/components/risk-analysis"
 
-type Step = "dropzone" | "second-file" | "preview" | "results"
+type Step = "dropzone" | "second-file" | "preview" | "results" | "risk"
 
 interface UploadSummary {
   receivables_count: number
@@ -19,8 +20,8 @@ interface RecordData {
   debtor_name?: string | null
   payer_cnpj?: string | null
   payer_name?: string | null
-  face_value?: number
-  amount?: number
+  face_value?: string
+  amount?: string
   due_date?: string | null
   date?: string | null
   status?: string
@@ -46,20 +47,20 @@ interface ConciliationData {
   matches: Array<{
     debtor_cnpj: string | null
     debtor_name: string | null
-    receivable_value: number
-    payment_value: number
+    receivable_value: string
+    payment_value: string
     confidence: number
   }>
   unmatched_receivables: Array<{
     debtor_cnpj: string | null
     debtor_name: string | null
-    face_value: number
+    face_value: string
     due_date: string | null
   }>
   unmatched_payments: Array<{
     payer_cnpj: string | null
     payer_name: string | null
-    amount: number
+    amount: string
     date: string | null
   }>
 }
@@ -73,6 +74,7 @@ export default function AppPage() {
   const [totalPayments, setTotalPayments] = useState(0)
   const [uploadData, setUploadData] = useState<UploadData | null>(null)
   const [conciliationData, setConciliationData] = useState<ConciliationData | null>(null)
+  const [riskData, setRiskData] = useState<any>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -148,6 +150,31 @@ export default function AppPage() {
     }
   }
 
+  const handleAnalyzeRisk = async () => {
+    if (!sessionToken) return
+    setLoading(true)
+    setError(null)
+
+    try {
+      const res = await fetch(
+        `${API_URL}/api/v1/instant/risk?session_token=${sessionToken}`
+      )
+
+      if (!res.ok) {
+        const err = await res.json()
+        throw new Error(err.detail || "Erro ao analisar risco")
+      }
+
+      const data = await res.json()
+      setRiskData(data)
+      setStep("risk")
+    } catch (e: any) {
+      setError(e.message || "Erro de conexao com o servidor")
+    } finally {
+      setLoading(false)
+    }
+  }
+
   const handleReset = () => {
     setStep("dropzone")
     setSessionToken(null)
@@ -155,6 +182,7 @@ export default function AppPage() {
     setTotalPayments(0)
     setUploadData(null)
     setConciliationData(null)
+    setRiskData(null)
     setError(null)
   }
 
@@ -234,7 +262,32 @@ export default function AppPage() {
         )}
 
         {step === "results" && conciliationData && (
-          <ConciliationResult data={conciliationData} sessionToken={sessionToken!} />
+          <div className="space-y-6">
+            <ConciliationResult data={conciliationData} sessionToken={sessionToken!} />
+            <div className="text-center">
+              <button
+                onClick={handleAnalyzeRisk}
+                disabled={loading}
+                className="px-8 py-3 bg-prysma-600 text-white rounded-xl font-semibold hover:bg-prysma-700 transition-colors disabled:opacity-50"
+              >
+                {loading ? (
+                  <span className="flex items-center gap-2">
+                    <span className="h-4 w-4 rounded-full border-2 border-white/30 border-t-white animate-spin" />
+                    Analisando risco...
+                  </span>
+                ) : (
+                  "Analisar Risco dos Sacados"
+                )}
+              </button>
+              <p className="mt-2 text-xs text-slate-400">
+                Consulta Receita Federal + historico de pagamento
+              </p>
+            </div>
+          </div>
+        )}
+
+        {step === "risk" && riskData && (
+          <RiskAnalysis data={riskData} />
         )}
       </div>
     </main>

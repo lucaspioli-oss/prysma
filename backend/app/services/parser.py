@@ -308,6 +308,250 @@ def parse_ofx_content(content: bytes) -> dict:
     return {"receivables": [], "payments": payments, "errors": errors}
 
 
+# ---------------------------------------------------------------------------
+# CNAB 240 / 400 parser (retorno de cobrança)
+# ---------------------------------------------------------------------------
+
+# Occurrence codes that mean "paid/settled"
+CNAB_PAID_CODES = {"06", "07", "10", "17"}  # liquidação, parcial, baixa+liq, liq após baixa
+
+
+def _detect_cnab_format(content: bytes) -> str | None:
+    """Detect CNAB format by line length. Returns '240', '400', or None."""
+    for encoding in ["latin-1", "cp1252", "utf-8"]:
+        try:
+            text = content.decode(encoding)
+            break
+        except UnicodeDecodeError:
+            continue
+    else:
+        return None
+
+    lines = [l for l in text.replace("\r\n", "\n").replace("\r", "\n").split("\n") if l.strip()]
+    if not lines:
+        return None
+
+    length = len(lines[0])
+    if length == 240:
+        return "240"
+    elif length == 400:
+        return "400"
+    return None
+
+
+def _cnab_parse_value(raw: str, decimals: int = 2) -> Decimal:
+    """Parse CNAB fixed-width numeric value (e.g. '000001234567' → 12345.67)."""
+    raw = raw.strip()
+    if not raw or not raw.isdigit():
+        return Decimal("0")
+    integer_part = raw[:-decimals] if decimals else raw
+    decimal_part = raw[-decimals:] if decimals else ""
+    return Decimal(f"{int(integer_part)}.{decimal_part}")
+
+
+def _cnab_parse_date(raw: str) -> date | None:
+    """Parse CNAB date in DDMMYYYY (8 chars) or DDMMYY (6 chars)."""
+    raw = raw.strip()
+    if not raw or raw == "00000000" or raw == "000000" or not raw.isdigit():
+        return None
+    try:
+        if len(raw) == 8:
+            return datetime.strptime(raw, "%d%m%Y").date()
+        elif len(raw) == 6:
+            return datetime.strptime(raw, "%d%m%y").date()
+    except ValueError:
+        pass
+    return None
+
+
+def _cnab_extract_cnpj(raw: str) -> str | None:
+    """Extract and normalize CNPJ/CPF from CNAB fixed-width field."""
+    raw = raw.strip()
+    if not raw or raw == "0" * len(raw):
+        return None
+    # Remove leading zeros for CPF (11 digits) or CNPJ (14 digits)
+    digits = raw.lstrip("0")
+    if not digits:
+        return None
+    # Pad back to 11 or 14
+    full = raw.strip()
+    if len(full) <= 11:
+        return full.zfill(11)
+    return full.zfill(14)
+
+
+def parse_cnab240_content(content: bytes) -> dict:
+    """Parse CNAB 240 retorno file. Segments T+U → Payment records."""
+    for encoding in ["latin-1", "cp1252", "utf-8"]:
+        try:
+            text = content.decode(encoding)
+            break
+        except UnicodeDecodeError:
+            continue
+    else:
+        raise ValueError("Não foi possível decodificar o arquivo CNAB.")
+
+    lines = [l for l in text.replace("\r\n", "\n").replace("\r", "\n").split("\n") if l.strip()]
+
+    receivables = []
+    payments = []
+    errors = []
+
+    # Parse segments T and U in pairs
+    seg_t = None
+    for line_num, line in enumerate(lines, 1):
+        if len(line) < 240:
+            continue
+
+        tipo_registro = line[7]  # position 8 (0-indexed: 7)
+
+        if tipo_registro != "3":  # only detail records
+            continue
+
+        segmento = line[13].upper()  # position 14
+
+        if segmento == "T":
+            try:
+                codigo_ocorrencia = line[15:17].strip()
+                nosso_numero = line[40:48].strip()
+                numero_documento = line[58:68].strip()
+                vencimento = _cnab_parse_date(line[73:81])
+                valor_titulo = _cnab_parse_value(line[81:96])
+                tipo_inscricao = line[132]  # 1=CPF, 2=CNPJ
+                inscricao_pagador = line[133:148]
+                nome_pagador = line[148:178].strip()
+
+                payer_cnpj = _cnab_extract_cnpj(inscricao_pagador)
+
+                seg_t = {
+                    "ocorrencia": codigo_ocorrencia,
+                    "nosso_numero": nosso_numero,
+                    "numero_documento": numero_documento,
+                    "vencimento": vencimento,
+                    "valor_titulo": valor_titulo,
+                    "payer_cnpj": payer_cnpj,
+                    "payer_name": nome_pagador if nome_pagador else None,
+                    "line": line_num,
+                }
+            except Exception as e:
+                errors.append({"row": line_num, "error": str(e)})
+                seg_t = None
+
+        elif segmento == "U" and seg_t is not None:
+            try:
+                valor_pago = _cnab_parse_value(line[77:92])
+                data_ocorrencia = _cnab_parse_date(line[137:145])
+                data_credito = _cnab_parse_date(line[145:153])
+                juros_multa = _cnab_parse_value(line[17:32])
+                desconto = _cnab_parse_value(line[32:47])
+
+                is_paid = seg_t["ocorrencia"] in CNAB_PAID_CODES
+
+                # Receivable: always create from seg T (the boleto)
+                receivables.append(Receivable(
+                    debtor_cnpj=seg_t["payer_cnpj"],
+                    debtor_name=seg_t["payer_name"],
+                    face_value=seg_t["valor_titulo"],
+                    due_date=seg_t["vencimento"],
+                    status="conciliated" if is_paid else "pending",
+                    source="cnab240",
+                ))
+
+                # Payment: only if paid
+                if is_paid and valor_pago > 0:
+                    ref = seg_t["nosso_numero"] or seg_t["numero_documento"]
+                    payments.append(Payment(
+                        payer_cnpj=seg_t["payer_cnpj"],
+                        payer_name=seg_t["payer_name"],
+                        amount=valor_pago,
+                        date=data_credito or data_ocorrencia,
+                        bank_reference=ref if ref else None,
+                        source="cnab240",
+                    ))
+            except Exception as e:
+                errors.append({"row": line_num, "error": str(e)})
+            finally:
+                seg_t = None
+
+    return {"receivables": receivables, "payments": payments, "errors": errors}
+
+
+def parse_cnab400_content(content: bytes) -> dict:
+    """Parse CNAB 400 retorno file. Detail records → Payment records."""
+    for encoding in ["latin-1", "cp1252", "utf-8"]:
+        try:
+            text = content.decode(encoding)
+            break
+        except UnicodeDecodeError:
+            continue
+    else:
+        raise ValueError("Não foi possível decodificar o arquivo CNAB.")
+
+    lines = [l for l in text.replace("\r\n", "\n").replace("\r", "\n").split("\n") if l.strip()]
+
+    receivables = []
+    payments = []
+    errors = []
+
+    for line_num, line in enumerate(lines, 1):
+        if len(line) < 400:
+            continue
+
+        tipo_registro = line[0]
+        if tipo_registro != "1":  # only detail records
+            continue
+
+        try:
+            codigo_ocorrencia = line[108:110].strip()
+            data_ocorrencia = _cnab_parse_date(line[110:116])
+            numero_documento = line[116:126].strip()
+            nosso_numero = line[62:70].strip()
+            vencimento = _cnab_parse_date(line[146:152])
+            valor_titulo = _cnab_parse_value(line[152:165])
+            valor_pago = _cnab_parse_value(line[253:266])
+            juros_multa = _cnab_parse_value(line[266:279])
+            desconto = _cnab_parse_value(line[240:253])
+            nome_pagador = line[324:354].strip() if len(line) > 354 else None
+            data_credito = _cnab_parse_date(line[295:301]) if len(line) > 301 else None
+
+            is_paid = codigo_ocorrencia in CNAB_PAID_CODES
+
+            # Receivable: always create from detail (the boleto)
+            receivables.append(Receivable(
+                debtor_name=nome_pagador if nome_pagador else None,
+                face_value=valor_titulo,
+                due_date=vencimento,
+                status="conciliated" if is_paid else "pending",
+                source="cnab400",
+            ))
+
+            # Payment: only if paid
+            if is_paid and valor_pago > 0:
+                ref = nosso_numero or numero_documento
+                payments.append(Payment(
+                    payer_name=nome_pagador if nome_pagador else None,
+                    amount=valor_pago,
+                    date=data_credito or data_ocorrencia,
+                    bank_reference=ref if ref else None,
+                    source="cnab400",
+                ))
+
+        except Exception as e:
+            errors.append({"row": line_num, "error": str(e)})
+
+    return {"receivables": receivables, "payments": payments, "errors": errors}
+
+
+def parse_cnab_content(content: bytes) -> dict:
+    """Auto-detect CNAB 240 or 400 and parse."""
+    fmt = _detect_cnab_format(content)
+    if fmt == "240":
+        return parse_cnab240_content(content)
+    elif fmt == "400":
+        return parse_cnab400_content(content)
+    raise ValueError("Arquivo CNAB não reconhecido. Verifique se é um retorno CNAB 240 ou 400.")
+
+
 def parse_file(content: bytes, filename: str) -> dict:
     """Route to the correct parser based on file extension."""
     if filename.endswith(".csv"):
@@ -316,5 +560,11 @@ def parse_file(content: bytes, filename: str) -> dict:
         return parse_xlsx_content(content)
     elif filename.endswith(".ofx"):
         return parse_ofx_content(content)
+    elif filename.endswith(".ret") or filename.endswith(".rem") or filename.endswith(".cnab"):
+        return parse_cnab_content(content)
     else:
-        raise ValueError(f"Unsupported file type: {filename}. Use CSV, XLSX or OFX.")
+        # Try CNAB auto-detect for extensionless or .txt files
+        cnab_fmt = _detect_cnab_format(content)
+        if cnab_fmt:
+            return parse_cnab_content(content)
+        raise ValueError(f"Formato não suportado: {filename}. Use CSV, XLSX, OFX ou CNAB.")

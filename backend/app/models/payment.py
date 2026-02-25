@@ -29,6 +29,7 @@ class Payment(Base):
     )
     match_status: Mapped[str] = mapped_column(String(20), default="unmatched")
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), onupdate=func.now())
 
     organization = relationship("Organization", back_populates="payments")
     matched_receivable = relationship("Receivable", foreign_keys=[matched_receivable_id])

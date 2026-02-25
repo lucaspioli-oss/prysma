@@ -33,8 +33,8 @@ async def instant_upload(
 
     try:
         result = parse_file(content, filename)
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Formato de arquivo inválido ou não suportado")
 
     async with async_session() as db:
         # Reuse existing session or create new
@@ -77,7 +77,7 @@ async def instant_upload(
             {
                 "debtor_cnpj": r.debtor_cnpj,
                 "debtor_name": r.debtor_name,
-                "face_value": float(r.face_value),
+                "face_value": str(r.face_value),
                 "due_date": r.due_date.isoformat() if r.due_date else None,
                 "status": r.status,
             }
@@ -87,7 +87,7 @@ async def instant_upload(
             {
                 "payer_cnpj": p.payer_cnpj,
                 "payer_name": p.payer_name,
-                "amount": float(p.amount),
+                "amount": str(p.amount),
                 "date": p.date.isoformat() if p.date else None,
             }
             for p in result["payments"]
@@ -169,25 +169,25 @@ async def instant_export(session_token: str):
     for r in receivables:
         p = payment_by_recv.get(r.id)
         if p:
-            diff = float(p.amount) - float(r.face_value)
+            diff = p.amount - r.face_value
             writer.writerow([
                 "CONCILIADO",
                 r.debtor_cnpj or "",
                 r.debtor_name or "",
-                f"{float(r.face_value):.2f}",
+                str(r.face_value),
                 r.due_date.isoformat() if r.due_date else "",
                 p.payer_cnpj or "",
                 p.payer_name or "",
-                f"{float(p.amount):.2f}",
+                str(p.amount),
                 p.date.isoformat() if p.date else "",
-                f"{diff:.2f}" if diff != 0 else "",
+                str(diff) if diff != 0 else "",
             ])
         else:
             writer.writerow([
                 "NAO PAGO",
                 r.debtor_cnpj or "",
                 r.debtor_name or "",
-                f"{float(r.face_value):.2f}",
+                str(r.face_value),
                 r.due_date.isoformat() if r.due_date else "",
                 "", "", "", "", "",
             ])
@@ -202,7 +202,7 @@ async def instant_export(session_token: str):
                 "", "",
                 p.payer_cnpj or "",
                 p.payer_name or "",
-                f"{float(p.amount):.2f}",
+                str(p.amount),
                 p.date.isoformat() if p.date else "",
                 "",
             ])
@@ -213,3 +213,24 @@ async def instant_export(session_token: str):
         media_type="text/csv",
         headers={"Content-Disposition": "attachment; filename=conciliacao_prysma.csv"},
     )
+
+
+@router.get("/risk")
+async def instant_risk(session_token: str):
+    """Run risk analysis for all debtors in a session."""
+    from app.services.risk_scoring import analyze_session_risk
+
+    async with async_session() as db:
+        stmt = select(AnonymousSession).where(
+            AnonymousSession.session_token == session_token
+        )
+        result = await db.execute(stmt)
+        session = result.scalar_one_or_none()
+
+        if not session:
+            raise HTTPException(status_code=404, detail="Session not found")
+
+        risk_result = await analyze_session_risk(db, session.id)
+        await db.commit()
+
+    return risk_result

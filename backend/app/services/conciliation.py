@@ -152,8 +152,8 @@ async def run_conciliation(
             "debtor_cnpj": recv.debtor_cnpj,
             "debtor_name": recv.debtor_name,
             "payer_name": pay.payer_name,
-            "receivable_value": float(recv.face_value),
-            "payment_value": float(pay.amount),
+            "receivable_value": str(recv.face_value),
+            "payment_value": str(pay.amount),
             "confidence": confidence,
         })
 
@@ -168,7 +168,7 @@ async def run_conciliation(
             "id": str(r.id),
             "debtor_cnpj": r.debtor_cnpj,
             "debtor_name": r.debtor_name,
-            "face_value": float(r.face_value),
+            "face_value": str(r.face_value),
             "due_date": r.due_date.isoformat() if r.due_date else None,
         }
         for r in receivables
@@ -180,7 +180,7 @@ async def run_conciliation(
             "id": str(p.id),
             "payer_cnpj": p.payer_cnpj,
             "payer_name": p.payer_name,
-            "amount": float(p.amount),
+            "amount": str(p.amount),
             "date": p.date.isoformat() if p.date else None,
         }
         for p in payments

@@ -9,7 +9,7 @@ interface DropzoneProps {
   subtitle: string
 }
 
-const ACCEPTED_TYPES = [".csv", ".xlsx", ".xls", ".ofx"]
+const ACCEPTED_TYPES = [".csv", ".xlsx", ".xls", ".ofx", ".ret", ".rem", ".cnab", ".txt"]
 
 export function Dropzone({ onFileUpload, loading, title, subtitle }: DropzoneProps) {
   const [dragActive, setDragActive] = useState(false)
@@ -105,7 +105,7 @@ export function Dropzone({ onFileUpload, loading, title, subtitle }: DropzonePro
               Arraste seu arquivo aqui
             </p>
             <p className="text-sm text-slate-400">
-              ou clique para selecionar — CSV, XLSX, OFX
+              ou clique para selecionar — CSV, XLSX, OFX, CNAB
             </p>
           </>
         )}

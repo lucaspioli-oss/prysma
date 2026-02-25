@@ -16,30 +16,31 @@ interface ConciliationResultProps {
     matches: Array<{
       debtor_cnpj: string | null
       debtor_name: string | null
-      receivable_value: number
-      payment_value: number
+      receivable_value: string
+      payment_value: string
       confidence: number
     }>
     unmatched_receivables: Array<{
       debtor_cnpj: string | null
       debtor_name: string | null
-      face_value: number
+      face_value: string
       due_date: string | null
     }>
     unmatched_payments: Array<{
       payer_cnpj: string | null
       payer_name: string | null
-      amount: number
+      amount: string
       date: string | null
     }>
   }
 }
 
-function formatCurrency(value: number): string {
+function formatCurrency(value: string | number): string {
+  const num = typeof value === "string" ? parseFloat(value) : value
   return new Intl.NumberFormat("pt-BR", {
     style: "currency",
     currency: "BRL",
-  }).format(value)
+  }).format(num)
 }
 
 function confidenceColor(c: number): string {
