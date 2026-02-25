@@ -3,9 +3,9 @@
 from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, HTTPException, Depends
+import bcrypt
 from jose import jwt, JWTError
-from passlib.context import CryptContext
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel
 from sqlalchemy import select
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 
@@ -18,8 +18,15 @@ from app.models.receivable import Receivable
 from app.models.payment import Payment
 
 router = APIRouter(prefix="/api/v1/auth", tags=["auth"])
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 security = HTTPBearer()
+
+
+def hash_password(password: str) -> str:
+    return bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
+
+
+def verify_password(password: str, hashed: str) -> bool:
+    return bcrypt.checkpw(password.encode("utf-8"), hashed.encode("utf-8"))
 
 
 # --- Schemas ---
@@ -98,7 +105,7 @@ async def register(req: RegisterRequest):
         user = User(
             organization_id=org.id,
             email=req.email,
-            password_hash=pwd_context.hash(req.password),
+            password_hash=hash_password(req.password),
             role="admin",
         )
         db.add(user)
@@ -161,7 +168,7 @@ async def login(req: LoginRequest):
         result = await db.execute(select(User).where(User.email == req.email))
         user = result.scalar_one_or_none()
 
-        if not user or not pwd_context.verify(req.password, user.password_hash):
+        if not user or not verify_password(req.password, user.password_hash):
             raise HTTPException(status_code=401, detail="Email ou senha incorretos")
 
         # Get organization
