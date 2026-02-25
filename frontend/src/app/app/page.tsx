@@ -1,7 +1,8 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import Link from "next/link"
+import { useRouter } from "next/navigation"
 import { Dropzone } from "@/components/dropzone"
 import { UploadResult } from "@/components/upload-result"
 import { ConciliationResult } from "@/components/conciliation-result"
@@ -71,6 +72,8 @@ interface ConciliationData {
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
 
 export default function AppPage() {
+  const router = useRouter()
+  const [user, setUser] = useState<{ name: string; email: string } | null>(null)
   const [step, setStep] = useState<Step>("dropzone")
   const [sessionToken, setSessionToken] = useState<string | null>(null)
   const [totalReceivables, setTotalReceivables] = useState(0)
@@ -80,6 +83,13 @@ export default function AppPage() {
   const [riskData, setRiskData] = useState<any>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    const saved = localStorage.getItem("prysma_user")
+    if (saved) {
+      try { setUser(JSON.parse(saved)) } catch {}
+    }
+  }, [])
 
   const handleFileUpload = async (file: File) => {
     setLoading(true)
@@ -201,14 +211,43 @@ export default function AppPage() {
               Prysma
             </span>
           </Link>
-          {step !== "dropzone" && (
-            <button
-              onClick={handleReset}
-              className="text-sm text-slate-500 hover:text-slate-700 transition-colors"
-            >
-              Novo arquivo
-            </button>
-          )}
+          <div className="flex items-center gap-4">
+            {step !== "dropzone" && (
+              <button
+                onClick={handleReset}
+                className="text-sm text-slate-500 hover:text-slate-700 transition-colors"
+              >
+                Novo arquivo
+              </button>
+            )}
+            {user ? (
+              <div className="flex items-center gap-2">
+                <div className="h-7 w-7 rounded-full bg-prysma-100 flex items-center justify-center">
+                  <span className="text-prysma-700 text-xs font-bold">
+                    {user.name.charAt(0).toUpperCase()}
+                  </span>
+                </div>
+                <span className="text-sm text-slate-600 hidden sm:inline">{user.name}</span>
+                <button
+                  onClick={() => {
+                    localStorage.removeItem("prysma_token")
+                    localStorage.removeItem("prysma_user")
+                    setUser(null)
+                  }}
+                  className="text-xs text-slate-400 hover:text-slate-600 ml-1"
+                >
+                  Sair
+                </button>
+              </div>
+            ) : (
+              <Link
+                href="/login"
+                className="text-sm text-prysma-600 font-medium hover:text-prysma-700"
+              >
+                Entrar
+              </Link>
+            )}
+          </div>
         </div>
       </header>
 
@@ -290,7 +329,29 @@ export default function AppPage() {
         )}
 
         {step === "risk" && riskData && (
-          <RiskAnalysis data={riskData} />
+          <div className="space-y-8">
+            <RiskAnalysis data={riskData} />
+            {!user && (
+              <div className="text-center bg-prysma-50 rounded-2xl border border-prysma-100 p-8">
+                <h3 className="text-lg font-semibold text-slate-900 mb-2">
+                  Quer salvar e acompanhar ao longo do tempo?
+                </h3>
+                <p className="text-slate-500 mb-6 text-sm">
+                  Crie sua conta e tenha acesso ao historico completo, scoring de risco
+                  e alertas automaticos.
+                </p>
+                <Link
+                  href={`/registro${sessionToken ? `?session=${sessionToken}` : ""}`}
+                  className="inline-block px-6 py-3 bg-prysma-600 text-white rounded-xl font-semibold hover:bg-prysma-700 transition-colors"
+                >
+                  Criar conta gratis — 30 dias
+                </Link>
+                <p className="mt-3 text-xs text-slate-400">
+                  Sem cartao de credito. Seus dados de hoje serao vinculados a sua conta.
+                </p>
+              </div>
+            )}
+          </div>
         )}
       </div>
     </main>

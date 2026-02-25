@@ -9,6 +9,7 @@ from app.core.config import settings
 from app.core.database import create_tables
 from app.api.health import router as health_router
 from app.api.instant import router as instant_router
+from app.api.auth import router as auth_router
 from app.models.debtor_profile import DebtorProfile  # noqa: F401 — register model
 
 logger = logging.getLogger(__name__)
@@ -50,3 +51,4 @@ app.add_middleware(
 
 app.include_router(health_router)
 app.include_router(instant_router)
+app.include_router(auth_router)

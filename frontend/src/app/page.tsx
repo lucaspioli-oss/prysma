@@ -14,12 +14,20 @@ export default function LandingPage() {
               Prysma
             </span>
           </div>
-          <Link
-            href="/app"
-            className="px-5 py-2 bg-prysma-600 text-white text-sm font-medium rounded-lg hover:bg-prysma-700 transition-colors"
-          >
-            Testar gratis
-          </Link>
+          <div className="flex items-center gap-3">
+            <Link
+              href="/login"
+              className="px-4 py-2 text-sm font-medium text-slate-600 hover:text-slate-900 transition-colors"
+            >
+              Entrar
+            </Link>
+            <Link
+              href="/app"
+              className="px-5 py-2 bg-prysma-600 text-white text-sm font-medium rounded-lg hover:bg-prysma-700 transition-colors"
+            >
+              Testar gratis
+            </Link>
+          </div>
         </div>
       </header>
 
