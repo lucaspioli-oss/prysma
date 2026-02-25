@@ -11,7 +11,7 @@ export default function LandingPage() {
               <span className="text-white font-bold text-sm">P</span>
             </div>
             <span className="text-xl font-bold text-slate-900">
-              Prysma<span className="text-prysma-600">Q</span>
+              Prysma
             </span>
           </div>
           <Link
@@ -167,7 +167,7 @@ export default function LandingPage() {
             <div className="bg-gradient-to-br from-prysma-50 to-slate-50 rounded-2xl border border-slate-200 p-10 text-center">
               <div className="text-6xl font-bold text-prysma-600 mb-2">30s</div>
               <p className="text-slate-500 mb-6">
-                E o tempo que o PrysmaQ leva pra fazer
+                E o tempo que o Prysma leva pra fazer
                 o que voce faz em 3 horas.
               </p>
               <div className="space-y-3 text-left max-w-xs mx-auto">
@@ -176,7 +176,7 @@ export default function LandingPage() {
                   <span className="text-sm font-semibold text-red-500">~3 horas</span>
                 </div>
                 <div className="flex items-center justify-between bg-white rounded-lg px-4 py-2 border border-prysma-200">
-                  <span className="text-sm text-slate-600">PrysmaQ</span>
+                  <span className="text-sm text-slate-600">Prysma</span>
                   <span className="text-sm font-semibold text-prysma-600">30 segundos</span>
                 </div>
               </div>
@@ -252,7 +252,7 @@ export default function LandingPage() {
               <span className="text-white font-bold text-xs">P</span>
             </div>
             <span className="text-sm text-slate-500">
-              PrysmaQ by DrexQuant
+              Prysma by DrexQuant
             </span>
           </div>
           <p className="text-xs text-slate-400">

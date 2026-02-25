@@ -211,5 +211,5 @@ async def instant_export(session_token: str):
     return StreamingResponse(
         io.BytesIO(csv_content.encode("utf-8-sig")),
         media_type="text/csv",
-        headers={"Content-Disposition": "attachment; filename=conciliacao_prysmaq.csv"},
+        headers={"Content-Disposition": "attachment; filename=conciliacao_prysma.csv"},
     )

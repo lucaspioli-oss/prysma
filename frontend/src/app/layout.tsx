@@ -5,7 +5,7 @@ import "./globals.css"
 const inter = Inter({ subsets: ["latin"] })
 
 export const metadata: Metadata = {
-  title: "PrysmaQ — Conciliação Inteligente de Recebíveis",
+  title: "Prysma — Conciliacao Inteligente de Recebiveis",
   description:
     "Arraste seu arquivo e veja seus recebíveis conciliados em 30 segundos. Sem cadastro, sem configuração.",
 }

@@ -16,7 +16,7 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title="PrysmaQ",
+    title="Prysma",
     description="Plataforma de Conciliação e Inteligência de Recebíveis",
     version="0.1.0",
     lifespan=lifespan,

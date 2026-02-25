@@ -167,7 +167,7 @@ export default function AppPage() {
               <span className="text-white font-bold text-sm">P</span>
             </div>
             <span className="text-xl font-bold text-slate-900">
-              Prysma<span className="text-prysma-600">Q</span>
+              Prysma
             </span>
           </Link>
           {step !== "dropzone" && (
