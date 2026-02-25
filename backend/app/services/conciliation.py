@@ -154,6 +154,8 @@ async def run_conciliation(
             "payer_name": pay.payer_name,
             "receivable_value": str(recv.face_value),
             "payment_value": str(pay.amount),
+            "due_date": recv.due_date.isoformat() if recv.due_date else None,
+            "payment_date": pay.date.isoformat() if pay.date else None,
             "confidence": confidence,
         })
 

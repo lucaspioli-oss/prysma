@@ -47,8 +47,11 @@ interface ConciliationData {
   matches: Array<{
     debtor_cnpj: string | null
     debtor_name: string | null
+    payer_name: string | null
     receivable_value: string
     payment_value: string
+    due_date: string | null
+    payment_date: string | null
     confidence: number
   }>
   unmatched_receivables: Array<{
