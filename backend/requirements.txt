@@ -1,0 +1,16 @@
+fastapi==0.133.0
+uvicorn[standard]==0.41.0
+sqlalchemy[asyncio]==2.0.47
+aiosqlite==0.22.1
+asyncpg>=0.30.0
+alembic==1.18.4
+pydantic==2.12.5
+pydantic-settings==2.13.1
+python-multipart==0.0.22
+python-jose[cryptography]==3.5.0
+passlib[bcrypt]==1.7.4
+redis==7.2.0
+openpyxl==3.1.5
+ofxparse==0.21
+python-dotenv==1.2.1
+httpx==0.28.1
